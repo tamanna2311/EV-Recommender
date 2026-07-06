@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
 import json
@@ -12,6 +13,13 @@ from src.recommender import get_recommendations
 from src.explanation_generator import generate_explanation
 
 app = FastAPI(title="EV Car Recommendation API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class UserPreferences(BaseModel):
     budget_lakh: float
