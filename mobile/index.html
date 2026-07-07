@@ -127,6 +127,17 @@
       </form>
 
       <section class="results" id="results" aria-live="polite"></section>
+
+      <section class="news-section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">EV news</p>
+            <h2 class="section-title">Latest updates</h2>
+          </div>
+          <button class="secondary-button" id="refreshNews" type="button">Refresh</button>
+        </div>
+        <div class="news-list" id="newsList" aria-live="polite"></div>
+      </section>
     </main>
 
     <template id="resultTemplate">
@@ -145,6 +156,15 @@
         </div>
         <p class="reason"></p>
         <p class="drawbacks"></p>
+      </article>
+    </template>
+
+    <template id="newsTemplate">
+      <article class="news-card">
+        <a target="_blank" rel="noopener noreferrer">
+          <h3></h3>
+          <p class="news-meta"></p>
+        </a>
       </article>
     </template>
 

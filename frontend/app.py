@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
+from datetime import datetime
 
 import os
 
@@ -8,6 +9,18 @@ import os
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 st.set_page_config(page_title="EV Car Recommender", layout="wide")
+
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_ev_news():
+    response = requests.get(f"{API_URL}/news", timeout=10)
+    response.raise_for_status()
+    return response.json().get("articles", [])
+
+def format_news_date(value):
+    try:
+        return datetime.fromisoformat(value).strftime("%d %b %Y")
+    except ValueError:
+        return ""
 
 st.title("Electric Vehicle (EV) Recommendation System")
 st.markdown("Find the best electric car in India based on your personal preferences.")
@@ -108,3 +121,31 @@ if submit_button:
                 
         except requests.exceptions.RequestException as e:
             st.error(f"Error connecting to backend API. Please make sure the FastAPI server is running. ({e})")
+
+st.divider()
+news_title_col, refresh_col = st.columns([4, 1])
+with news_title_col:
+    st.subheader("EV News")
+with refresh_col:
+    if st.button("Refresh News", use_container_width=True):
+        fetch_ev_news.clear()
+
+try:
+    with st.spinner("Loading EV news..."):
+        articles = fetch_ev_news()
+
+    if not articles:
+        st.info("No EV news is available right now.")
+    else:
+        for article in articles[:8]:
+            st.markdown(f"**[{article['title']}]({article['url']})**")
+            meta = " · ".join(
+                value for value in [
+                    article.get("source", ""),
+                    format_news_date(article.get("published_at", "")),
+                ] if value
+            )
+            if meta:
+                st.caption(meta)
+except requests.exceptions.RequestException as e:
+    st.error(f"Could not load EV news. ({e})")

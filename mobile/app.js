@@ -7,6 +7,9 @@ const range = document.querySelector("#range");
 const budgetValue = document.querySelector("#budgetValue");
 const rangeValue = document.querySelector("#rangeValue");
 const installButton = document.querySelector("#installButton");
+const newsList = document.querySelector("#newsList");
+const newsTemplate = document.querySelector("#newsTemplate");
+const refreshNews = document.querySelector("#refreshNews");
 
 let deferredInstallPrompt;
 
@@ -17,6 +20,14 @@ const updateRangeLabels = () => {
 
 const setNotice = (message) => {
   results.innerHTML = `<p class="notice">${message}</p>`;
+};
+
+const setNewsNotice = (message) => {
+  newsList.innerHTML = "";
+  const notice = document.createElement("p");
+  notice.className = "notice";
+  notice.textContent = message;
+  newsList.appendChild(notice);
 };
 
 const getPayload = () => {
@@ -57,6 +68,55 @@ const renderRecommendations = (recommendations) => {
     card.querySelector(".drawbacks").textContent = rec.drawbacks;
     results.appendChild(card);
   });
+};
+
+const formatArticleDate = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const renderNews = (articles) => {
+  newsList.innerHTML = "";
+
+  if (!articles.length) {
+    setNewsNotice("No EV news is available right now.");
+    return;
+  }
+
+  articles.forEach((article) => {
+    const card = newsTemplate.content.cloneNode(true);
+    const link = card.querySelector("a");
+    const meta = [article.source, formatArticleDate(article.published_at)].filter(Boolean).join(" · ");
+
+    link.href = article.url;
+    card.querySelector("h3").textContent = article.title;
+    card.querySelector(".news-meta").textContent = meta;
+    newsList.appendChild(card);
+  });
+};
+
+const loadNews = async () => {
+  refreshNews.disabled = true;
+  setNewsNotice("Loading EV news...");
+
+  try {
+    const response = await fetch(`${API_URL}/news`);
+    if (!response.ok) {
+      throw new Error(`Backend returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    renderNews(data.articles || []);
+  } catch (error) {
+    setNewsNotice(`Could not load EV news. ${error.message}`);
+  } finally {
+    refreshNews.disabled = false;
+  }
 };
 
 form.addEventListener("submit", async (event) => {
@@ -101,6 +161,9 @@ installButton.addEventListener("click", async () => {
   deferredInstallPrompt = null;
   installButton.hidden = true;
 });
+
+refreshNews.addEventListener("click", loadNews);
+loadNews();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

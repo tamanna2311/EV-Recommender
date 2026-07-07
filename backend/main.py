@@ -1,8 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
+from urllib.parse import quote
+import xml.etree.ElementTree as ET
 import pandas as pd
-import json
+import requests
 import sys
 import os
 
@@ -20,6 +24,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+NEWS_QUERIES = [
+    "electric vehicles India",
+    "EV charging India",
+    "electric car India",
+    "EV battery India",
+]
+NEWS_CACHE = {
+    "expires_at": datetime.min.replace(tzinfo=timezone.utc),
+    "payload": None,
+}
 
 class UserPreferences(BaseModel):
     budget_lakh: float
@@ -41,6 +56,80 @@ def load_data():
     except:
         return pd.read_csv('../data/ev_cars_features.csv')
 
+def parse_news_date(value):
+    try:
+        parsed = parsedate_to_datetime(value)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except Exception:
+        return datetime.min.replace(tzinfo=timezone.utc)
+
+def clean_google_news_title(title, source):
+    suffix = f" - {source}"
+    if source and title.endswith(suffix):
+        return title[:-len(suffix)].strip()
+    return title.strip()
+
+def fetch_news_feed(query):
+    feed_url = (
+        "https://news.google.com/rss/search?"
+        f"q={quote(query)}&hl=en-IN&gl=IN&ceid=IN:en"
+    )
+    response = requests.get(feed_url, headers={"User-Agent": "EV-Recommender/1.0"}, timeout=8)
+    response.raise_for_status()
+    root = ET.fromstring(response.content)
+
+    articles = []
+    for item in root.findall("./channel/item"):
+        title = item.findtext("title", default="").strip()
+        link = item.findtext("link", default="").strip()
+        source = item.findtext("source", default="").strip()
+        published_raw = item.findtext("pubDate", default="")
+        published_at = parse_news_date(published_raw)
+
+        if not title or not link:
+            continue
+
+        articles.append({
+            "title": clean_google_news_title(title, source),
+            "source": source or "Google News",
+            "url": link,
+            "published_at": published_at.isoformat(),
+            "topic": query,
+        })
+
+    return articles
+
+def get_ev_news(limit=12):
+    now = datetime.now(timezone.utc)
+    if NEWS_CACHE["payload"] and NEWS_CACHE["expires_at"] > now:
+        return NEWS_CACHE["payload"]
+
+    articles_by_title = {}
+    for query in NEWS_QUERIES:
+        try:
+            for article in fetch_news_feed(query):
+                key = article["title"].lower()
+                if key not in articles_by_title:
+                    articles_by_title[key] = article
+        except Exception:
+            continue
+
+    articles = sorted(
+        articles_by_title.values(),
+        key=lambda item: item["published_at"],
+        reverse=True,
+    )[:limit]
+
+    payload = {
+        "articles": articles,
+        "updated_at": now.isoformat(),
+    }
+    NEWS_CACHE["payload"] = payload
+    NEWS_CACHE["expires_at"] = now + timedelta(minutes=15)
+    return payload
+
 @app.get("/")
 def read_root():
     return {"status": "success", "message": "EV Car Recommendation API is running"}
@@ -57,6 +146,13 @@ def get_car(car_id: str):
     if len(car) == 0:
         raise HTTPException(status_code=404, detail="Car not found")
     return car.to_dict(orient="records")[0]
+
+@app.get("/news")
+def get_news():
+    news = get_ev_news()
+    if not news["articles"]:
+        raise HTTPException(status_code=503, detail="EV news is temporarily unavailable")
+    return news
 
 @app.post("/recommend")
 def recommend_cars(prefs: UserPreferences):

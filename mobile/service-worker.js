@@ -1,4 +1,4 @@
-const CACHE_NAME = "ev-finder-v1";
+const CACHE_NAME = "ev-finder-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
