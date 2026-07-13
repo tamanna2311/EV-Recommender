@@ -1,4 +1,4 @@
-const DEFAULT_API_URL = "https://ev-recommender.onrender.com";
+const DEFAULT_API_URL = "https://ev-recommender-64pm.onrender.com";
 const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.hostname) || window.location.protocol === "file:";
 const API_URL = window.EV_API_URL || (isLocalHost ? "http://127.0.0.1:8000" : DEFAULT_API_URL);
 const BEHAVIOR_STORAGE_KEY = "evFinder.behavior.v2";
