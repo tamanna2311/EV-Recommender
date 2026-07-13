@@ -8,3 +8,10 @@ services:
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /
     autoDeploy: true
+
+  - type: web
+    name: ev-recommender-frontend
+    runtime: static
+    rootDir: mobile
+    staticPublishPath: .
+    autoDeploy: true
