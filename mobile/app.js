@@ -19,6 +19,8 @@ const navButtons = document.querySelectorAll(".nav-button");
 const views = document.querySelectorAll(".app-view");
 const brandPreference = document.querySelector("#brandPreference");
 const bodyPreference = document.querySelector("#bodyPreference");
+const carDetail = document.querySelector("#carDetail");
+const backToExplore = document.querySelector("#backToExplore");
 
 const newsList = document.querySelector("#newsList");
 const newsTemplate = document.querySelector("#newsTemplate");
@@ -44,8 +46,13 @@ let captureRows = [];
 let captureStartMs = 0;
 let captureTimer;
 let isRecording = false;
+let previousPrimaryView = "explore";
 
 const activateView = (target) => {
+  const currentView = document.querySelector(".app-view.active")?.dataset.view;
+  if (currentView && currentView !== "detail") {
+    previousPrimaryView = currentView;
+  }
   views.forEach((view) => view.classList.toggle("active", view.dataset.view === target));
   navButtons.forEach((button) => button.classList.toggle("active", button.dataset.target === target));
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -121,6 +128,148 @@ const getPayload = () => {
 const displayPrice = (rec) => rec.price_text || `Rs ${formatLakh(rec.price_lakh)} Lakh`;
 const displayRange = (rec) => rec.range_text || `${Number(rec.claimed_range_km).toLocaleString("en-IN")} km`;
 const displayBattery = (rec) => rec.battery_text || `${formatLakh(rec.battery_capacity_kwh)} kWh`;
+const displayNumber = (value, suffix = "", maximumFractionDigits = 0) => {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return "Not listed";
+  return `${number.toLocaleString("en-IN", { maximumFractionDigits })}${suffix}`;
+};
+
+const appendTextBlock = (parent, className, text) => {
+  if (!text) return;
+  const paragraph = document.createElement("p");
+  paragraph.className = className;
+  paragraph.textContent = text;
+  parent.appendChild(paragraph);
+};
+
+const createSpec = (label, value) => {
+  const item = document.createElement("div");
+  item.className = "spec-item";
+  const small = document.createElement("small");
+  const strong = document.createElement("strong");
+  small.textContent = label;
+  strong.textContent = value || "Not listed";
+  item.append(small, strong);
+  return item;
+};
+
+const renderSpecSection = (parent, title, specs) => {
+  const visibleSpecs = specs.filter((spec) => spec.value && spec.value !== "Not listed");
+  if (!visibleSpecs.length) return;
+
+  const section = document.createElement("section");
+  section.className = "detail-section";
+  const heading = document.createElement("h3");
+  const grid = document.createElement("div");
+  heading.textContent = title;
+  grid.className = "spec-grid";
+  visibleSpecs.forEach((spec) => grid.appendChild(createSpec(spec.label, spec.value)));
+  section.append(heading, grid);
+  parent.appendChild(section);
+};
+
+const openCarDetail = (rec) => {
+  recordCarBehavior(rec);
+  carDetail.innerHTML = "";
+
+  const hero = document.createElement("div");
+  hero.className = "detail-hero";
+  if (rec.image_url) {
+    const image = document.createElement("img");
+    image.src = rec.image_url;
+    image.alt = `${rec.car_name} exterior`;
+    hero.appendChild(image);
+  }
+  if (rec.status) {
+    const status = document.createElement("span");
+    status.className = "status-pill";
+    status.textContent = rec.status;
+    hero.appendChild(status);
+  }
+
+  const content = document.createElement("div");
+  content.className = "detail-content";
+
+  const titleRow = document.createElement("div");
+  titleRow.className = "detail-title-row";
+  const titleWrap = document.createElement("div");
+  const title = document.createElement("h2");
+  const meta = document.createElement("p");
+  const match = document.createElement("strong");
+  title.textContent = rec.car_name;
+  meta.className = "detail-meta";
+  meta.textContent = [rec.brand, rec.body_type].filter(Boolean).join(" · ");
+  match.className = "match";
+  match.textContent = `${rec.match_percentage}%`;
+  titleWrap.append(title, meta);
+  titleRow.append(titleWrap, match);
+  content.appendChild(titleRow);
+
+  renderSpecSection(content, "Main fit", [
+    { label: "Price", value: displayPrice(rec) },
+    { label: "Range", value: displayRange(rec) },
+    { label: "Battery", value: displayBattery(rec) },
+    { label: "Recent sales", value: displayNumber(rec.sales_latest_month, "") },
+  ]);
+
+  renderSpecSection(content, "Practical details", [
+    { label: "Seats", value: displayNumber(rec.seating_capacity, "") },
+    { label: "Boot space", value: displayNumber(rec.boot_space_litres, " L") },
+    { label: "Ground clearance", value: displayNumber(rec.ground_clearance_mm, " mm") },
+    { label: "Safety", value: Number(rec.safety_rating) > 0 ? `${Number(rec.safety_rating).toFixed(1)} / 5` : "Not listed" },
+  ]);
+
+  renderSpecSection(content, "Charging and performance", [
+    { label: "Fast charging", value: rec.fast_charging_available ? "Available" : "No" },
+    { label: "AC charge", value: displayNumber(rec.charging_time_ac_hours, " hr", 1) },
+    { label: "DC charge", value: displayNumber(rec.charging_time_dc_minutes, " min") },
+    { label: "Motor power", value: displayNumber(rec.motor_power_kw, " kW") },
+    { label: "Torque", value: displayNumber(rec.torque_nm, " Nm") },
+    { label: "0-100 km/h", value: displayNumber(rec.acceleration_0_100_sec, " sec", 1) },
+  ]);
+
+  const explanation = document.createElement("section");
+  explanation.className = "detail-section";
+  const explanationTitle = document.createElement("h3");
+  explanationTitle.textContent = "Why this car";
+  explanation.appendChild(explanationTitle);
+  appendTextBlock(explanation, "reason", rec.reason);
+  appendTextBlock(explanation, "drawbacks", rec.drawbacks);
+  appendTextBlock(explanation, "reason", rec.useful_features || rec.pros);
+  appendTextBlock(explanation, "drawbacks", rec.cons);
+  content.appendChild(explanation);
+
+  renderSpecSection(content, "Data", [
+    { label: "Source", value: rec.data_source || "Market reference" },
+    { label: "Last updated", value: rec.last_updated },
+    { label: "Vehicle warranty", value: displayNumber(rec.warranty_years, " years") },
+    { label: "Battery warranty", value: displayNumber(rec.battery_warranty_years, " years") },
+  ]);
+
+  const actions = document.createElement("div");
+  actions.className = "detail-actions";
+  if (rec.source_url) {
+    const source = document.createElement("a");
+    source.href = rec.source_url;
+    source.target = "_blank";
+    source.rel = "noopener noreferrer";
+    source.textContent = "Open source";
+    source.addEventListener("click", () => {
+      recordCarBehavior(rec, "open_source");
+      window.setTimeout(loadPersonalizedRecommendations, 250);
+    });
+    actions.appendChild(source);
+  }
+  const close = document.createElement("button");
+  close.type = "button";
+  close.textContent = "Back to results";
+  close.addEventListener("click", () => activateView(previousPrimaryView));
+  actions.appendChild(close);
+  content.appendChild(actions);
+
+  carDetail.append(hero, content);
+  activateView("detail");
+};
 
 const renderRecommendations = (container, recommendations, options = {}) => {
   const emptyMessage = options.emptyMessage || "No cars matched this search. Try relaxing budget, range, or family size.";
@@ -137,7 +286,11 @@ const renderRecommendations = (container, recommendations, options = {}) => {
     const image = card.querySelector(".car-image");
     const status = card.querySelector(".status-pill");
     const link = card.querySelector(".details-link");
+    const detailsButton = card.querySelector(".details-button");
     const sales = card.querySelector(".sales");
+    article.tabIndex = 0;
+    article.setAttribute("role", "button");
+    article.setAttribute("aria-label", `Open details for ${rec.car_name}`);
 
     card.querySelector(".rank").textContent = `${options.rankLabel || "Pick"} #${rec.rank}`;
     card.querySelector("h2").textContent = `${rec.car_name}`;
@@ -160,7 +313,8 @@ const renderRecommendations = (container, recommendations, options = {}) => {
 
     if (rec.source_url) {
       link.href = rec.source_url;
-      link.addEventListener("click", () => {
+      link.addEventListener("click", (event) => {
+        event.stopPropagation();
         recordCarBehavior(rec, "open_source");
         window.setTimeout(loadPersonalizedRecommendations, 250);
       });
@@ -172,7 +326,20 @@ const renderRecommendations = (container, recommendations, options = {}) => {
       sales.textContent = `${Number(rec.sales_latest_month).toLocaleString("en-IN")} recent sales`;
     }
 
-    article.addEventListener("pointerdown", () => recordCarBehavior(rec));
+    article.addEventListener("click", (event) => {
+      if (event.target.closest("a, button")) return;
+      openCarDetail(rec);
+    });
+    article.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openCarDetail(rec);
+      }
+    });
+    detailsButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openCarDetail(rec);
+    });
     container.appendChild(card);
   });
 };
@@ -512,6 +679,7 @@ updateRangeLabels();
 
 refreshPersonalized.addEventListener("click", loadPersonalizedRecommendations);
 refreshNews.addEventListener("click", loadNews);
+backToExplore.addEventListener("click", () => activateView(previousPrimaryView));
 startCapture.addEventListener("click", startRecording);
 stopCapture.addEventListener("click", stopRecording);
 sendCapture.addEventListener("click", sendRecording);

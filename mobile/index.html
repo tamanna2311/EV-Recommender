@@ -228,6 +228,14 @@
 
         <section class="results" id="shareStatus" aria-live="polite"></section>
       </section>
+
+      <section class="app-view" data-view="detail">
+        <button class="back-button" id="backToExplore" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 4 12l7 7 1.4-1.4L7.8 13H20v-2H7.8l4.6-4.6L11 5Z"/></svg>
+          <span>Back</span>
+        </button>
+        <article class="detail-panel" id="carDetail" aria-live="polite"></article>
+      </section>
     </main>
 
     <nav class="bottom-nav" aria-label="Main">
@@ -272,7 +280,8 @@
           <p class="reason"></p>
           <p class="drawbacks"></p>
           <div class="card-actions">
-            <a class="details-link" target="_blank" rel="noopener noreferrer">View source</a>
+            <button class="details-button" type="button">Open details</button>
+            <a class="details-link" target="_blank" rel="noopener noreferrer">Source</a>
             <span class="sales"></span>
           </div>
         </div>
