@@ -202,10 +202,7 @@ def get_car(car_id: str):
 
 @app.get("/news")
 def get_news():
-    news = get_ev_news()
-    if not news["articles"]:
-        raise HTTPException(status_code=503, detail="EV news is temporarily unavailable")
-    return news
+    return get_ev_news()
 
 @app.post("/detect")
 async def detect_ev_from_accelerometer(request: Request):
